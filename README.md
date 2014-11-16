@@ -1,6 +1,4 @@
-sahilt
+Email to Github Issues
 ======
 
-My Stuff
-
-hahah
+Creates github issues from a specified email address to specified git repo.
