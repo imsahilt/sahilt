@@ -5,9 +5,55 @@ import imaplib
 import email.header
 
 from exceptions import InvalidEmailFolderException, MessageNotFoundException
-from configs import IMAP_URL, EMAIL_FOLDER, FOLDER_SEARCH_CRITERIA, DEFAUT_EMAIL_LIMIT
+from configs import IMAP_URL, EMAIL_FOLDER, DEFAUT_EMAIL_LIMIT
 
 DEFAULT_BODY = '<no body>'
+MESSAGE_PARTS = '(RFC822)'
+SUCCESS = 'OK'
+FOLDER_SEARCH_CRITERIA = '(UNSEEN)'
+FLAGS_COMMAND = '+FLAGS'
+SEEN_FLAG = '\\Seen' 
+
+
+class Email:
+    """
+        This class contains structure of get_email response and
+        parser methods to extract parts of email_message.
+    """
+    def __init__(self, header, message):
+        self._header = header
+        self._email_message = message
+
+    def get_header(self):
+        """
+            gets header of email.
+        """
+        return self._header
+
+    def get_email_message(self):
+        """
+            gets the email message.
+        """
+        return self._email_message
+
+    def get_email_subject(self):
+        """
+            Returns subject of email after decoding it from email header.
+        """
+        subject = email.header.decode_header(self._email_message['Subject'])[0][0]
+        return subject
+
+    def get_email_body(self):
+        """
+            Extracts email body from email message
+        """
+        body = DEFAULT_BODY
+        content_type = 'Content-Type'
+        if 'text/plain' in str(self._email_message.get_payload()[0][content_type]):
+            body = str(self._email_message.get_payload()[0])  # get plain text.
+        elif 'multipart/alternative' in str(self._email_message.get_payload()[0][content_type]):
+            body = str(self._email_message.get_payload()[0].get_payload()[0])
+        return body
 
 
 class EmailSAO:
@@ -21,12 +67,12 @@ class EmailSAO:
         """
             Login to email account.
         """
+        self._imap = imaplib.IMAP4_SSL(IMAP_URL)
         try:
-            data = self._imap.login(self._uname, self._password)
+            self._imap.login(self._uname, self._password)
         except imaplib.IMAP4.error as e:
             print('Damn!! login failed with error:{}'.format(e))
-            sys.exit(1)  # TODO:
-        return data
+            sys.exit(1)  # exit with error.
 
     def _search_emails(self):
         """
@@ -34,7 +80,7 @@ class EmailSAO:
             for poller
         """
         resp = self._imap.search(None, FOLDER_SEARCH_CRITERIA)
-        if resp[0] != 'OK':
+        if resp[0] != SUCCESS:
             raise MessageNotFoundException('No emails with given search criteria:{}'.format(FOLDER_SEARCH_CRITERIA))
         return resp[1]
 
@@ -44,61 +90,62 @@ class EmailSAO:
         """
         resp = self._search_emails()
 
-        email_message_list = []
+        emails_response = []
         counter = 1
         for num in resp[0].split():  # Iterate through list of emails
-            message = self._imap.fetch(num, '(RFC822)')  # Fetch email body
-            if message[0] != 'OK':
+            message = self._imap.fetch(num, MESSAGE_PARTS)  # Fetch email body
+            if message[0] != SUCCESS:
                 raise MessageNotFoundException("ERROR getting message number:{}".format(num))
             parsed_message = email.message_from_bytes(message[1][0][1])
-            email_message_list.append(parsed_message)
-            if counter > limit:
+            emails_response.append(Email(num, parsed_message))  # build email response
+            if counter > limit:  # as gmail does not provide limited fetching
                 break
             counter = counter + 1
-
-        return email_message_list
+        return emails_response
 
     def get_emails(self, limit=DEFAUT_EMAIL_LIMIT):
         """
-            Fetch emails from specified folder and return a list of email messages.
+            Fetch emails from specified folder and return a list of
+            Email messages.
         """
-        self._imap = imaplib.IMAP4_SSL(IMAP_URL)
         self._login()
-        resp = self._imap.select(self._email_folder)
-        if resp[0] == 'OK':
+        # Read-only true so that we can handle the case of process dying in during processing of email message.
+        resp = self._imap.select(self._email_folder, readonly=True)
+        if resp[0] == SUCCESS:
             email_message_list = self._get_email_list(limit)
             self._imap.close()
         else:
             raise InvalidEmailFolderException('Email folder can not be selected')
-        self._imap.logout()  # TODO:
+        self._logout()
         return email_message_list
 
-    def get_email_subject(self, email_message):
+    def mark_message_seen(self, unseen_message_header):
         """
-            Returns subject of email after decoding it from email header.
+            Marks message unseen for unseen_message_header.
         """
-        subject = email.header.decode_header(email_message['Subject'])[0][0]
-        return subject
+        self._login()  # TODO: find a better way
+        resp = self._imap.select(self._email_folder)
+        if resp[0] == SUCCESS:
+            self._imap.store(unseen_message_header, FLAGS_COMMAND, SEEN_FLAG)
+            self._imap.close()
+        else:
+            raise InvalidEmailFolderException('Email folder can not be selected')
+        self._logout()
 
-    def get_email_body(self, email_message):
+    def _logout(self):
         """
-            Parses email body from email message
+            logout of email account.
         """
-        body = DEFAULT_BODY
-        if 'text/plain' in str(email_message.get_payload()[0]['Content-Type']):
-            body = str(email_message.get_payload()[0])
-        elif 'multipart/alternative' in str(email_message.get_payload()[0]['Content-Type']):
-            body = str(email_message.get_payload()[0].get_payload()[0])
-        return body
+        self._imap.logout()
 
 
 def main():
-    emailSao = EmailSAO('imsahilt@gmail.com', 'T3st1234', EMAIL_FOLDER)
+    emailSao = EmailSAO('<secret>', '<top_secret>', EMAIL_FOLDER)  # TODO: remove
     email_message_list = emailSao.get_emails()
-    print(email_message_list)
     for email in email_message_list:
-        print(emailSao.get_email_subject(email))
-        print(emailSao.get_email_body(email))
+        print(email.get_email_subject())
+        print(email.get_email_body())
+        emailSao.mark_message_seen(email.get_header())
 
 if __name__ == "__main__":
     main()

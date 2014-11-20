@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# constants.py contains global constants.
+# cofigs.py contains project configurations.
 
 
 # github connect
@@ -13,7 +13,6 @@ IMAP_URL = 'imap.gmail.com'
 EMAIL_FOLDER = "INBOX"  # specify email folder to read emails.
 EMAIL_ACCOUNT = "<secret>"
 PASS = '<top_secret>'
-FOLDER_SEARCH_CRITERIA = '(UNSEEN)'
 DEFAUT_EMAIL_LIMIT = 10
 
 DEFAULT_FETCH_INTERVAL = 5  # in seconds

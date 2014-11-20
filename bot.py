@@ -34,9 +34,10 @@ class Bot():
                 print("Got {} messages to process..".format(len(email_list)))
                 for email in email_list:
                     try:  # Process rest of the list even if one message is faulty.
-                        title = self._email_sao.get_email_subject(email)
-                        body = self._email_sao.get_email_body(email)
+                        title = email.get_email_subject()
+                        body = email.get_email_body()
                         self._github_sao.create_issue(title, body)
+                        self._email_sao.mark_message_seen(email.get_header())  # mark message seen only after processing is complete
                     except Exception as e:
                         self._handle_exception(e)
             except Exception as e:
