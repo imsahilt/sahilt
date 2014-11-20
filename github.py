@@ -3,12 +3,16 @@
 
 import json
 import sys
+import logging
 
 from urllib.request import urlopen
 from urllib.parse import urlencode
 
 from exceptions import ValidationException
-from configs import ISSUES_URL, AUTH_TOKEN
+from configs import ISSUES_URL, AUTH_TOKEN, LOG_FORMAT, LOG_FILE
+
+logging.basicConfig(filename=LOG_FILE, format=LOG_FORMAT, level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 DEFAULT_TITLE = '<no title>'
 
@@ -31,7 +35,7 @@ class GithubSAO:
         issues_url_with_auth_token = ISSUES_URL + '?' + params
         response = urlopen(issues_url_with_auth_token, data=encoded_data)
         if(response.status == 201):
-            print('Created issue..{}'.format(data))
+            logger.info('Created issue..{}'.format(data))
         return response
 
 

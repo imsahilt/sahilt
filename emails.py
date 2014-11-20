@@ -3,16 +3,20 @@
 import sys
 import imaplib
 import email.header
+import logging
 
-from exceptions import InvalidEmailFolderException, MessageNotFoundException
-from configs import IMAP_URL, EMAIL_FOLDER, DEFAUT_EMAIL_LIMIT
+from exceptions import InvalidEmailFolderException, MessageNotFoundException, InvalidCredentials, InvalidSearchCriteria
+from configs import IMAP_URL, EMAIL_FOLDER, DEFAUT_EMAIL_LIMIT, LOG_FORMAT, LOG_FILE
+
+logging.basicConfig(filename=LOG_FILE, format=LOG_FORMAT, level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 DEFAULT_BODY = '<no body>'
 MESSAGE_PARTS = '(RFC822)'
 SUCCESS = 'OK'
 FOLDER_SEARCH_CRITERIA = '(UNSEEN)'
 FLAGS_COMMAND = '+FLAGS'
-SEEN_FLAG = '\\Seen' 
+SEEN_FLAG = '\\Seen'
 
 
 class Email:
@@ -71,8 +75,8 @@ class EmailSAO:
         try:
             self._imap.login(self._uname, self._password)
         except imaplib.IMAP4.error as e:
-            print('Damn!! login failed with error:{}'.format(e))
-            sys.exit(1)  # exit with error.
+            logger.error('Damn!! login failed with error:{}'.format(e))
+            raise InvalidCredentials('Damn!! login failed with error:{}'.format(e))
 
     def _search_emails(self):
         """
@@ -81,7 +85,8 @@ class EmailSAO:
         """
         resp = self._imap.search(None, FOLDER_SEARCH_CRITERIA)
         if resp[0] != SUCCESS:
-            raise MessageNotFoundException('No emails with given search criteria:{}'.format(FOLDER_SEARCH_CRITERIA))
+            logger.error('Invalid search criteria {}'.format(FOLDER_SEARCH_CRITERIA))
+            raise InvalidSearchCriteria('Invalid search criteria {}'.format(FOLDER_SEARCH_CRITERIA))
         return resp[1]
 
     def _get_email_list(self, limit):
@@ -89,12 +94,14 @@ class EmailSAO:
             Parse and build List of email messages.
         """
         resp = self._search_emails()
-
+        if not resp[0]:
+            logger.debug('No emails with given search criteria:{}'.format(FOLDER_SEARCH_CRITERIA))
         emails_response = []
         counter = 1
         for num in resp[0].split():  # Iterate through list of emails
             message = self._imap.fetch(num, MESSAGE_PARTS)  # Fetch email body
             if message[0] != SUCCESS:
+                logger.warn("ERROR getting message number:{}".format(num))
                 raise MessageNotFoundException("ERROR getting message number:{}".format(num))
             parsed_message = email.message_from_bytes(message[1][0][1])
             emails_response.append(Email(num, parsed_message))  # build email response
@@ -115,6 +122,7 @@ class EmailSAO:
             email_message_list = self._get_email_list(limit)
             self._imap.close()
         else:
+            logger.error('Email folder:{} can not be selected'.format(self._email_folder))
             raise InvalidEmailFolderException('Email folder can not be selected')
         self._logout()
         return email_message_list
@@ -127,8 +135,10 @@ class EmailSAO:
         resp = self._imap.select(self._email_folder)
         if resp[0] == SUCCESS:
             self._imap.store(unseen_message_header, FLAGS_COMMAND, SEEN_FLAG)
+            logger.info('Successfully marked {} :header seen'.format(unseen_message_header))
             self._imap.close()
         else:
+            logger.error('Email folder:{} can not be selected while marking message read'.format(self._email_folder))
             raise InvalidEmailFolderException('Email folder can not be selected')
         self._logout()
 
@@ -140,7 +150,7 @@ class EmailSAO:
 
 
 def main():
-    emailSao = EmailSAO('<secret>', '<top_secret>', EMAIL_FOLDER)  # TODO: remove
+    emailSao = EmailSAO('imsahilt@gmail.com', 'T3st1234', EMAIL_FOLDER)  # TODO: remove
     email_message_list = emailSao.get_emails()
     for email in email_message_list:
         print(email.get_email_subject())

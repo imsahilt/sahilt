@@ -16,3 +16,6 @@ PASS = '<top_secret>'
 DEFAUT_EMAIL_LIMIT = 10
 
 DEFAULT_FETCH_INTERVAL = 5  # in seconds
+
+LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+LOG_FILE = 'bot.log'

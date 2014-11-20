@@ -47,3 +47,21 @@ class MessageNotFoundException(RetryableException):
 
     def __init__(self, msg):
         self.msg = msg
+
+
+class InvalidCredentials(NonRetryableException):
+    """
+        Exception raised when invalid credentials are provided
+    """
+
+    def __init__(self, msg):
+        self.msg = msg
+
+
+class InvalidSearchCriteria(NonRetryableException):
+    """
+        Exception raised when invalid credentials are provided
+    """
+
+    def __init__(self, msg):
+        self.msg = msg
