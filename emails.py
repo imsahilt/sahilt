@@ -150,7 +150,7 @@ class EmailSAO:
 
 
 def main():
-    emailSao = EmailSAO('imsahilt@gmail.com', 'T3st1234', EMAIL_FOLDER)  # TODO: remove
+    emailSao = EmailSAO('email', 'pwd', EMAIL_FOLDER)
     email_message_list = emailSao.get_emails()
     for email in email_message_list:
         print(email.get_email_subject())
